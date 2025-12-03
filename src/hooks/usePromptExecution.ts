@@ -627,6 +627,13 @@ export function usePromptExecution(config: UsePromptExecutionConfig): UsePromptE
                 return;
               }
 
+              // 🔧 FIX: Skip Gemini CLI stderr messages (debug info, metrics, startup logs)
+              // These are system messages with eventType: "stderr" that should not be shown to users
+              if (data.type === 'system' && data.geminiMetadata?.eventType === 'stderr') {
+                console.log('[usePromptExecution] Skipping Gemini stderr message');
+                return;
+              }
+
               // 🔧 FIX: Handle delta messages - merge with last message of same type
               const isDelta = data.geminiMetadata?.delta || data.delta;
               const msgType = data.type;
