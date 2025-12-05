@@ -4,6 +4,7 @@ import { MessageBubble } from "./MessageBubble";
 import { MessageContent } from "./MessageContent";
 import { ToolCallsGroup } from "./ToolCallsGroup";
 import { ThinkingBlock } from "./ThinkingBlock";
+import { MessageActions } from "./MessageActions";
 import { cn } from "@/lib/utils";
 import { tokenExtractor } from "@/lib/tokenExtractor";
 import { formatTimestamp } from "@/lib/messageUtils";
@@ -166,7 +167,11 @@ export const AIMessage: React.FC<AIMessageProps> = ({
           </div>
 
           {/* Right Column: Content */}
-          <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex-1 min-w-0 space-y-1 relative">
+            {/* Actions Toolbar - Visible on Hover */}
+            <div className="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+              <MessageActions content={text || thinkingContent} />
+            </div>
             
             {/* Main Content */}
             <div className="space-y-3">

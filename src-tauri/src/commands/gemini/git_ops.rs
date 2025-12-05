@@ -246,6 +246,7 @@ fn extract_gemini_prompts(session_id: &str, project_path: &str) -> Result<Vec<Pr
             git_commit_after: None,
             timestamp,
             source: "project".to_string(), // Gemini always from project interface
+            line_number: 0, // Gemini uses JSON format, no specific line number
         });
 
         prompt_index += 1;

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Undo2, AlertTriangle, ChevronDown, ChevronUp, User } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
 import { MessageImagePreview, extractImagesFromContent, extractImagePathsFromText } from "./MessageImagePreview";
+import { MessageActions } from "./MessageActions";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -258,6 +259,13 @@ export const UserMessage: React.FC<UserMessageProps> = ({
 
         {/* 消息内容和撤回按钮 - 优化布局，按钮悬浮在右下角 */}
         <div className="relative min-w-0">
+          {/* Actions Toolbar - Visible on Hover (Left side for User messages) */}
+          {!isSkills && (
+            <div className="absolute -top-2 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+              <MessageActions content={text} />
+            </div>
+          )}
+
           {/* 消息内容 */}
           <div className="w-full min-w-0">
             {/* 文本内容（只在有文本时显示） */}

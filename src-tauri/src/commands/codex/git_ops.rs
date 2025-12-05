@@ -170,7 +170,7 @@ pub fn extract_codex_prompts(session_id: &str) -> Result<Vec<PromptRecord>, Stri
     let mut prompts: Vec<PromptRecord> = Vec::new();
     let mut prompt_index = 0;
 
-    for line in content.lines() {
+    for (line_idx, line) in content.lines().enumerate() {
         if line.trim().is_empty() {
             continue;
         }
@@ -211,6 +211,7 @@ pub fn extract_codex_prompts(session_id: &str) -> Result<Vec<PromptRecord>, Stri
                         git_commit_after: None,
                         timestamp,
                         source: "cli".to_string(), // default to CLI; update below if git record exists
+                        line_number: line_idx,
                     });
                     prompt_index += 1;
                 }

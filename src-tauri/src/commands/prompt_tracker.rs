@@ -54,6 +54,8 @@ pub struct PromptRecord {
     pub timestamp: i64,
     /// Prompt source: "project" (sent from project interface with queue-operation) or "cli" (sent from CLI)
     pub source: String,
+    /// Line number in the JSONL file (0-based)
+    pub line_number: usize,
 }
 
 /// Git record for a prompt (stored by content hash)
@@ -780,42 +782,20 @@ fn extract_prompts_from_jsonl(
 
     let mut prompts = Vec::new();
     let mut prompt_index = 0;
+    let mut pending_dequeue = false;
 
-    // 🔧 FIX: Track line indices where "dequeue" operations occur
-    // Claude CLI writes {"type":"queue-operation","operation":"dequeue"} before user messages
-    // We'll mark the next user message after a dequeue as from "project" source
-    let mut dequeue_line_indices = std::collections::HashSet::new();
-    let lines_vec: Vec<&str> = content.lines().collect();
-
-    for (line_idx, line) in lines_vec.iter().enumerate() {
+    for (line_idx, line) in content.lines().enumerate() {
         if let Ok(msg) = serde_json::from_str::<serde_json::Value>(line) {
             let msg_type = msg.get("type").and_then(|t| t.as_str());
+
+            // Check for dequeue operation
             if msg_type == Some("queue-operation") {
                 let operation = msg.get("operation").and_then(|o| o.as_str());
-                // 🔧 FIX: Match "dequeue" instead of "enqueue" (Claude CLI uses "dequeue")
                 if operation == Some("dequeue") {
-                    dequeue_line_indices.insert(line_idx);
-                    log::debug!("[Prompt Source] Found dequeue operation at line {}", line_idx);
+                    pending_dequeue = true;
+                    continue;
                 }
             }
-        }
-    }
-    log::info!("[Prompt Source] Found {} dequeue operations", dequeue_line_indices.len());
-
-
-    // 🔧 FIX: Track which line indices have dequeue before them
-    let mut user_messages_after_dequeue = std::collections::HashSet::new();
-    for (line_idx, _line) in lines_vec.iter().enumerate() {
-        // Check if previous line (line_idx - 1) is a dequeue operation
-        if line_idx > 0 && dequeue_line_indices.contains(&(line_idx - 1)) {
-            user_messages_after_dequeue.insert(line_idx);
-            log::debug!("[Prompt Source] Line {} is a user message after dequeue", line_idx);
-        }
-    }
-
-    for (line_idx, line) in lines_vec.iter().enumerate() {
-        if let Ok(msg) = serde_json::from_str::<serde_json::Value>(line) {
-            let msg_type = msg.get("type").and_then(|t| t.as_str());
 
             // Skip non-user message types
             if msg_type != Some("user") {
@@ -892,14 +872,15 @@ fn extract_prompts_from_jsonl(
                 .map(|dt| dt.timestamp())
                 .unwrap_or_else(|| Utc::now().timestamp());
 
-            // 🔧 FIX: Determine source by checking if this user message follows a dequeue operation
-            let source = if user_messages_after_dequeue.contains(&line_idx) {
-                log::debug!("[Prompt Source] Prompt #{} at line {} follows dequeue -> source=project", prompt_index, line_idx);
+            // Determine source
+            let source = if pending_dequeue {
                 "project".to_string()
             } else {
-                log::debug!("[Prompt Source] Prompt #{} at line {} no dequeue -> source=cli", prompt_index, line_idx);
                 "cli".to_string()
             };
+            
+            // Reset pending_dequeue
+            pending_dequeue = false;
 
             // Create prompt record
             prompts.push(PromptRecord {
@@ -909,6 +890,7 @@ fn extract_prompts_from_jsonl(
                 git_commit_after: None,
                 timestamp,
                 source,
+                line_number: line_idx,
             });
 
             prompt_index += 1;
