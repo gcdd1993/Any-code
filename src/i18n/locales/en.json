@@ -1058,6 +1058,13 @@
     "searchPrompts": "Search prompts... (Ctrl+F)"
   },
   "projectList": {
+    "gridView": "Grid View",
+    "listView": "List View",
+    "projectListLabel": "Project List",
+    "confirmDelete": "Confirm Delete",
+    "projectLabel": "Project {{projectName}}, {{sessionCount}} sessions, created {{createdAt}}"
+  },
+  "sessionList": {
     "gridView": "Grid view",
     "listView": "List view",
     "projectListLabel": "Project list",

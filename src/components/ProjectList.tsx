@@ -289,7 +289,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                 "shadow-sm hover:shadow-lg hover:shadow-primary/5",
                 viewMode === "grid" ? "p-5" : "px-4 py-3 flex items-center gap-4"
               )}
-              aria-label={`项目 ${projectName}，包含 ${sessionCount} 个会话，创建于 ${formatAbsoluteDateTime(project.created_at)}`}
+              aria-label={t('projectList.projectLabel', { projectName, sessionCount, createdAt: formatAbsoluteDateTime(project.created_at) })}
             >
               {/* 主要信息区：项目图标 + 项目名称 */}
               <div className={cn("flex items-start gap-4", viewMode === "grid" ? "mb-3" : "flex-1 items-center mb-0")}>

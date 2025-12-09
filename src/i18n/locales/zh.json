@@ -1093,7 +1093,8 @@
     "gridView": "网格视图",
     "listView": "列表视图",
     "projectListLabel": "项目列表",
-    "confirmDelete": "确认删除"
+    "confirmDelete": "确认删除",
+    "projectLabel": "项目 {{projectName}}，包含 {{sessionCount}} 个会话，创建于 {{createdAt}}"
   },
   "mcpImport": {
     "invalidJson": "无效的 JSON 格式。请检查输入格式。",
