@@ -25,6 +25,7 @@ import { useSmartAutoScroll } from '@/hooks/useSmartAutoScroll';
 import { useMessageTranslation } from '@/hooks/useMessageTranslation';
 import { useSessionLifecycle } from '@/hooks/useSessionLifecycle';
 import { usePromptExecution } from '@/hooks/usePromptExecution';
+import { useTranslation } from '@/hooks/useTranslation';
 import { MessagesProvider, useMessagesContext } from '@/contexts/MessagesContext';
 import { SessionProvider } from '@/contexts/SessionContext';
 import { PlanModeProvider, usePlanMode } from '@/contexts/PlanModeContext';

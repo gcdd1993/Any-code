@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface ClaudeExtensionsManagerProps {
   projectPath?: string;
@@ -83,6 +84,7 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
   className,
   onBack
 }) => {
+  const { t } = useTranslation();
   const [plugins, setPlugins] = useState<PluginInfo[]>([]);
   const [agents, setAgents] = useState<AgentFile[]>([]);
   const [skills, setSkills] = useState<SkillFile[]>([]);
@@ -177,8 +179,8 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
       name: '',
       description: '',
       content: type === 'agent'
-        ? '你是一个专业的 AI 助手。\n\n在执行任务时：\n- 仔细分析需求\n- 提供清晰的解决方案\n- 遵循最佳实践'
-        : '按照以下步骤执行任务：\n\n1. 分析输入\n2. 执行操作\n3. 返回结果',
+        ? t('extensions.defaultAgentContent')
+        : t('extensions.defaultSkillContent'),
       scope: projectPath ? 'project' : 'user',
     });
     setDialogOpen(true);
@@ -187,11 +189,11 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
   // Handle create
   const handleCreate = async () => {
     if (!formData.name.trim()) {
-      alert('请输入名称');
+      alert(t('placeholders.enterName'));
       return;
     }
     if (!formData.description.trim()) {
-      alert('请输入描述');
+      alert(t('placeholders.enterDescription'));
       return;
     }
 
@@ -219,7 +221,7 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
       setDialogOpen(false);
     } catch (error) {
       console.error('Failed to create:', error);
-      alert(`创建失败: ${error}`);
+      alert(`${t('errors.createFailed')}: ${error}`);
     } finally {
       setCreating(false);
     }
@@ -233,7 +235,7 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
 
   return (
     <div className={cn("space-y-4", className)}>
-      {/* 返回按钮 */}
+      {/* Back button */}
       {onBack && (
         <div className="flex items-center gap-3 mb-4">
           <Button
@@ -243,28 +245,28 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
             className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            返回主页
+            {t('common.backToHome')}
           </Button>
           <div>
-            <h2 className="text-lg font-semibold">Claude 扩展管理器</h2>
-            <p className="text-sm text-muted-foreground">管理 Plugins、Subagents 和 Agent Skills</p>
+            <h2 className="text-lg font-semibold">{t('extensions.title')}</h2>
+            <p className="text-sm text-muted-foreground">{t('extensions.subtitle')}</p>
           </div>
         </div>
       )}
-      
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="plugins">
             <Package className="h-4 w-4 mr-2" />
-            Plugins
+            {t('extensions.plugins')}
           </TabsTrigger>
           <TabsTrigger value="agents">
             <Bot className="h-4 w-4 mr-2" />
-            Subagents
+            {t('extensions.subagents')}
           </TabsTrigger>
           <TabsTrigger value="skills">
             <Sparkles className="h-4 w-4 mr-2" />
-            Skills
+            {t('extensions.skills')}
           </TabsTrigger>
         </TabsList>
 
@@ -272,14 +274,14 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
         <TabsContent value="plugins" className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold">Plugins</h3>
+              <h3 className="text-lg font-semibold">{t('extensions.plugins')}</h3>
               <p className="text-sm text-muted-foreground">
-                已安装的插件（可包含 commands、agents、skills、hooks、MCP servers）
+                {t('extensions.pluginsDescription')}
               </p>
             </div>
           </div>
 
-          {/* 插件列表 */}
+          {/* Plugin list */}
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -299,7 +301,7 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
                           </Badge>
                           {plugin.enabled && (
                             <Badge variant="default" className="text-xs bg-green-600">
-                              已启用
+                              {t('extensions.enabled')}
                             </Badge>
                           )}
                         </div>
@@ -309,14 +311,14 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
                           </p>
                         )}
                         <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                          {plugin.components.commands > 0 && <span>📝 {plugin.components.commands} 命令</span>}
-                          {plugin.components.agents > 0 && <span>🤖 {plugin.components.agents} 代理</span>}
-                          {plugin.components.skills > 0 && <span>✨ {plugin.components.skills} 技能</span>}
-                          {plugin.components.hooks > 0 && <span>🪝 钩子</span>}
-                          {plugin.components.mcpServers > 0 && <span>🔌 MCP</span>}
+                          {plugin.components.commands > 0 && <span>{plugin.components.commands} {t('extensions.commands')}</span>}
+                          {plugin.components.agents > 0 && <span>{plugin.components.agents} {t('extensions.agents')}</span>}
+                          {plugin.components.skills > 0 && <span>{plugin.components.skills} {t('extensions.skills')}</span>}
+                          {plugin.components.hooks > 0 && <span>{t('extensions.hooks')}</span>}
+                          {plugin.components.mcpServers > 0 && <span>MCP</span>}
                         </div>
                         {plugin.author && (
-                          <p className="text-xs text-muted-foreground mt-1">作者: {plugin.author}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{t('extensions.author')}: {plugin.author}</p>
                         )}
                       </div>
                     </div>
@@ -334,16 +336,16 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
           ) : (
             <Card className="p-6 text-center border-dashed">
               <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h4 className="font-medium mb-2">暂无已安装的 Plugins</h4>
+              <h4 className="font-medium mb-2">{t('extensions.noPlugins')}</h4>
               <p className="text-sm text-muted-foreground mb-4">
-                Plugins 存储在 .claude/plugins/ 目录下
+                {t('extensions.pluginsLocation')}
               </p>
               <div className="text-xs text-muted-foreground mb-4">
-                使用 <code className="bg-muted px-1 py-0.5 rounded">/plugin</code> 命令管理插件
+                {t('extensions.pluginCommand')}
               </div>
               <Button variant="outline" size="sm" onClick={handleOpenPluginsDir}>
                 <FolderOpen className="h-4 w-4 mr-2" />
-                打开目录
+                {t('extensions.openDirectory')}
               </Button>
             </Card>
           )}
@@ -353,18 +355,18 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
         <TabsContent value="agents" className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold">子代理</h3>
+              <h3 className="text-lg font-semibold">{t('extensions.subagentsTitle')}</h3>
               <p className="text-sm text-muted-foreground">
-                存储在 <code className="text-xs bg-muted px-1 py-0.5 rounded">.claude/agents/</code> 的专用代理
+                {t('extensions.subagentsDescription')}
               </p>
             </div>
             <Button size="sm" onClick={() => openCreateDialog('agent')}>
               <Plus className="h-4 w-4 mr-2" />
-              新建子代理
+              {t('extensions.newSubagent')}
             </Button>
           </div>
 
-          {/* 子代理列表 */}
+          {/* Subagent list */}
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -372,8 +374,8 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
           ) : agents.length > 0 ? (
             <div className="space-y-2">
               {agents.map((agent) => (
-                <Card 
-                  key={agent.path} 
+                <Card
+                  key={agent.path}
                   className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => api.openFileWithDefaultApp(agent.path)}
                 >
@@ -400,8 +402,8 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
                   </div>
                 </Card>
               ))}
-              
-              {/* 打开目录按钮 */}
+
+              {/* Open directory button */}
               <Button
                 variant="outline"
                 size="sm"
@@ -409,19 +411,19 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
                 onClick={handleOpenAgentsDir}
               >
                 <FolderOpen className="h-3.5 w-3.5 mr-2" />
-                打开子代理目录
+                {t('extensions.openSubagentsDir')}
               </Button>
             </div>
           ) : (
             <Card className="p-6 text-center border-dashed">
               <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h4 className="font-medium mb-2">暂无子代理</h4>
+              <h4 className="font-medium mb-2">{t('extensions.noSubagents')}</h4>
               <p className="text-sm text-muted-foreground mb-4">
-                子代理存储在 .claude/agents/ 目录下
+                {t('extensions.subagentsLocation')}
               </p>
               <Button variant="outline" size="sm" onClick={handleOpenAgentsDir}>
                 <FolderOpen className="h-4 w-4 mr-2" />
-                打开目录
+                {t('extensions.openDirectory')}
               </Button>
             </Card>
           )}
@@ -431,18 +433,18 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
         <TabsContent value="skills" className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold">Agent Skills</h3>
+              <h3 className="text-lg font-semibold">{t('extensions.skillsTitle')}</h3>
               <p className="text-sm text-muted-foreground">
-                存储在 <code className="text-xs bg-muted px-1 py-0.5 rounded">.claude/skills/</code> 的专用技能
+                {t('extensions.skillsDescription')}
               </p>
             </div>
             <Button size="sm" onClick={() => openCreateDialog('skill')}>
               <Plus className="h-4 w-4 mr-2" />
-              新建 Skill
+              {t('extensions.newSkill')}
             </Button>
           </div>
 
-          {/* Agent Skills 列表 */}
+          {/* Agent Skills list */}
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -450,8 +452,8 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
           ) : skills.length > 0 ? (
             <div className="space-y-2">
               {skills.map((skill) => (
-                <Card 
-                  key={skill.path} 
+                <Card
+                  key={skill.path}
                   className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => api.openFileWithDefaultApp(skill.path)}
                 >
@@ -478,8 +480,8 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
                   </div>
                 </Card>
               ))}
-              
-              {/* 打开目录按钮 */}
+
+              {/* Open directory button */}
               <Button
                 variant="outline"
                 size="sm"
@@ -487,46 +489,46 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
                 onClick={handleOpenSkillsDir}
               >
                 <FolderOpen className="h-3.5 w-3.5 mr-2" />
-                打开 Skills 目录
+                {t('extensions.openSkillsDir')}
               </Button>
             </div>
           ) : (
             <Card className="p-6 text-center border-dashed">
               <Sparkles className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h4 className="font-medium mb-2">暂无 Agent Skills</h4>
+              <h4 className="font-medium mb-2">{t('extensions.noSkills')}</h4>
               <p className="text-sm text-muted-foreground mb-4">
-                Agent Skills 存储在 .claude/skills/ 目录下（文件名格式：NAME.SKILL.md）
+                {t('extensions.skillsLocation')}
               </p>
               <Button variant="outline" size="sm" onClick={handleOpenSkillsDir}>
                 <FolderOpen className="h-4 w-4 mr-2" />
-                打开目录
+                {t('extensions.openDirectory')}
               </Button>
             </Card>
           )}
         </TabsContent>
       </Tabs>
 
-      {/* 官方文档和资源链接 */}
+      {/* Official docs and resources */}
       <div className="text-xs text-muted-foreground border-t pt-4 space-y-3">
         <div>
-          <p className="mb-2 font-medium">📚 官方文档：</p>
+          <p className="mb-2 font-medium">{t('extensions.officialDocs')}</p>
           <ul className="space-y-1 ml-4">
-            <li>• <a href="https://docs.claude.com/en/docs/claude-code/plugins" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Plugins 文档</a></li>
-            <li>• <a href="https://docs.claude.com/en/docs/claude-code/subagents" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Subagents 文档</a></li>
-            <li>• <a href="https://docs.claude.com/en/docs/claude-code/agent-skills" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Agent Skills 文档</a></li>
+            <li>- <a href="https://docs.claude.com/en/docs/claude-code/plugins" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{t('extensions.pluginsDocs')}</a></li>
+            <li>- <a href="https://docs.claude.com/en/docs/claude-code/subagents" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{t('extensions.subagentsDocs')}</a></li>
+            <li>- <a href="https://docs.claude.com/en/docs/claude-code/agent-skills" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{t('extensions.skillsDocs')}</a></li>
           </ul>
         </div>
 
         <div>
-          <p className="mb-2 font-medium">🎯 官方资源：</p>
+          <p className="mb-2 font-medium">{t('extensions.officialResources')}</p>
           <ul className="space-y-1 ml-4">
-            <li>• <a href="https://github.com/anthropics/skills" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-              Anthropic Skills 仓库
-              <span className="text-muted-foreground">(13.7k ⭐)</span>
+            <li>- <a href="https://github.com/anthropics/skills" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+              {t('extensions.anthropicSkillsRepo')}
+              <span className="text-muted-foreground">(13.7k)</span>
             </a></li>
           </ul>
           <p className="text-muted-foreground mt-2 ml-4 text-[11px]">
-            包含官方示例 Skills：文档处理、创意设计、开发工具等
+            {t('extensions.skillsRepoDescription')}
           </p>
         </div>
       </div>
@@ -536,18 +538,18 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
-              {dialogType === 'agent' ? '新建子代理' : '新建 Skill'}
+              {dialogType === 'agent' ? t('extensions.createSubagent') : t('extensions.createSkill')}
             </DialogTitle>
             <DialogDescription>
               {dialogType === 'agent'
-                ? '创建一个新的子代理。子代理是具有特定系统提示的专用 AI 助手。'
-                : '创建一个新的 Agent Skill。Skill 为 Claude 提供特定领域的知识和指导。'}
+                ? t('extensions.subagentDescription')
+                : t('extensions.skillDescription')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">名称</Label>
+              <Label htmlFor="name">{t('extensions.name')}</Label>
               <Input
                 id="name"
                 placeholder={dialogType === 'agent' ? 'code-reviewer' : 'python-helper'}
@@ -555,12 +557,12 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                只允许字母、数字、连字符和下划线
+                {t('extensions.nameHint')}
               </p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="description">描述</Label>
+              <Label htmlFor="description">{t('extensions.description')}</Label>
               <Input
                 id="description"
                 placeholder={dialogType === 'agent'
@@ -572,7 +574,7 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="scope">作用域</Label>
+              <Label htmlFor="scope">{t('extensions.scope')}</Label>
               <Select
                 value={formData.scope}
                 onValueChange={(value: 'project' | 'user') =>
@@ -584,23 +586,23 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
                 </SelectTrigger>
                 <SelectContent>
                   {projectPath && (
-                    <SelectItem value="project">项目级 (.claude/)</SelectItem>
+                    <SelectItem value="project">{t('extensions.projectScope')}</SelectItem>
                   )}
-                  <SelectItem value="user">用户级 (~/.claude/)</SelectItem>
+                  <SelectItem value="user">{t('extensions.userScope')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="content">
-                {dialogType === 'agent' ? '系统提示' : '指导内容'}
+                {dialogType === 'agent' ? t('extensions.systemPromptLabel') : t('extensions.guidanceContent')}
               </Label>
               <Textarea
                 id="content"
                 className="min-h-[150px] font-mono text-sm"
                 placeholder={dialogType === 'agent'
-                  ? '你是一个专业的代码审查专家...'
-                  : '按照以下步骤执行任务...'}
+                  ? t('extensions.systemPromptPlaceholder')
+                  : t('extensions.guidancePlaceholder')}
                 value={formData.content}
                 onChange={(e) => setFormData({ ...formData, content: e.target.value })}
               />
@@ -609,16 +611,16 @@ export const ClaudeExtensionsManager: React.FC<ClaudeExtensionsManagerProps> = (
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              取消
+              {t('buttons.cancel')}
             </Button>
             <Button onClick={handleCreate} disabled={creating}>
               {creating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  创建中...
+                  {t('messages.creating')}
                 </>
               ) : (
-                '创建'
+                t('buttons.create')
               )}
             </Button>
           </DialogFooter>
