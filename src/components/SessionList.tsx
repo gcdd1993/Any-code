@@ -337,7 +337,7 @@ export const SessionList: React.FC<SessionListProps> = ({
             className="h-10 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm transition-all duration-200 hover:shadow-md flex-shrink-0"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            <span>返回项目列表</span>
+            <span>{t('sessionList.backToProjects')}</span>
           </Button>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-medium truncate">{projectPath}</h2>
@@ -377,7 +377,7 @@ export const SessionList: React.FC<SessionListProps> = ({
       }}>
         <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="all" className="flex items-center gap-2">
-            全部
+            {t('sessionList.all')}
             {validSessions.length > 0 && (
               <span className="text-xs opacity-70">({validSessions.length})</span>
             )}
@@ -438,12 +438,12 @@ export const SessionList: React.FC<SessionListProps> = ({
                     )}
                   </Button>
                   <span className="text-sm text-muted-foreground">
-                    已选择 {selectedSessions.size} 个会话
+                    {t('sessionList.selectedCount', { count: selectedSessions.size })}
                   </span>
                 </>
               ) : (
                 <span className="text-sm text-muted-foreground">
-                  批量管理会话
+                  {t('sessionList.batchManage')}
                 </span>
               )}
             </>
@@ -524,7 +524,7 @@ export const SessionList: React.FC<SessionListProps> = ({
                   <Checkbox
                     checked={selectedSessions.has(session.id)}
                     onCheckedChange={() => toggleSessionSelection(session.id)}
-                    aria-label={`选择会话 ${firstMessagePreview}`}
+                    aria-label={t('sessionList.selectSession', { name: firstMessagePreview })}
                   />
                 </div>
               )}
@@ -538,7 +538,7 @@ export const SessionList: React.FC<SessionListProps> = ({
                   }
                 }}
                 className="flex-1 text-left px-4 py-2.5 min-w-0"
-                aria-label={`会话: ${firstMessagePreview}，时间: ${timeDisplay}`}
+                aria-label={t('sessionList.sessionAriaLabel', { name: firstMessagePreview, time: timeDisplay })}
               >
               <div className="flex items-center justify-between gap-3">
                 {/* Session info */}
@@ -568,7 +568,7 @@ export const SessionList: React.FC<SessionListProps> = ({
                   </div>
 
                   {/* Session ID (small and subtle) */}
-                  <p className="text-xs font-mono text-muted-foreground truncate" aria-label={`会话 ID: ${session.id}`}>
+                  <p className="text-xs font-mono text-muted-foreground truncate" aria-label={t('sessionList.sessionIdLabel', { id: session.id })}>
                     {session.id}
                   </p>
                 </div>
@@ -588,8 +588,8 @@ export const SessionList: React.FC<SessionListProps> = ({
               <button
                 onClick={(e) => handleConvertClick(e, session)}
                 className="px-3 py-2.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity hover:bg-primary/10 text-primary"
-                aria-label={`转换会话到 ${session.engine === 'codex' ? 'Claude' : 'Codex'}`}
-                title={`⚠️ 实验性功能：转换到 ${session.engine === 'codex' ? 'Claude' : 'Codex'}`}
+                aria-label={t('sessionList.convertTo', { engine: session.engine === 'codex' ? 'Claude' : 'Codex' })}
+                title={t('sessionList.experimentalConvert', { engine: session.engine === 'codex' ? 'Claude' : 'Codex' })}
               >
                 <RefreshCw className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -600,7 +600,7 @@ export const SessionList: React.FC<SessionListProps> = ({
               <button
                 onClick={(e) => handleDeleteClick(e, session)}
                 className="px-3 py-2.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity hover:bg-destructive/10 text-destructive"
-                aria-label={`删除会话 ${firstMessagePreview}`}
+                aria-label={t('sessionList.deleteSession', { name: firstMessagePreview })}
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -662,9 +662,9 @@ export const SessionList: React.FC<SessionListProps> = ({
       <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>转换会话引擎</DialogTitle>
+            <DialogTitle>{t('sessionList.convertTitle')}</DialogTitle>
             <DialogDescription>
-              将当前会话转换到其他引擎，生成新的 Session ID
+              {t('sessionList.convertDescription')}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -674,17 +674,17 @@ export const SessionList: React.FC<SessionListProps> = ({
                 <span className="text-yellow-600 dark:text-yellow-400 text-lg shrink-0">⚠️</span>
                 <div>
                   <p className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">
-                    实验性功能
+                    {t('sessionList.experimentalFeature')}
                   </p>
                   <p className="text-xs text-yellow-600/90 dark:text-yellow-400/90 mt-1">
-                    此功能正在测试中，稳定性未知。转换后的会话可能存在格式兼容性问题。建议在非关键项目中测试使用。
+                    {t('sessionList.experimentalWarning')}
                   </p>
                 </div>
               </div>
             </div>
 
             <p className="text-sm text-muted-foreground mb-4">
-              确定要将此会话转换到 <strong>{sessionToConvert?.engine === 'codex' ? 'Claude' : 'Codex'}</strong> 引擎吗？
+              {t('sessionList.confirmConvertTo', { engine: sessionToConvert?.engine === 'codex' ? 'Claude' : 'Codex' })}
             </p>
             <div className="space-y-3">
               {sessionToConvert && (
@@ -726,13 +726,13 @@ export const SessionList: React.FC<SessionListProps> = ({
               )}
               <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-md">
                 <p className="text-sm text-blue-600 dark:text-blue-400">
-                  ℹ️ 转换说明：
+                  ℹ️ {t('sessionList.convertNotes')}
                 </p>
                 <ul className="text-xs text-muted-foreground mt-2 space-y-1 list-disc list-inside">
-                  <li>将生成新的 Session ID</li>
-                  <li>原 Session 不会被修改或删除</li>
-                  <li>工具调用会自动映射转换</li>
-                  <li>仅支持已完成的 Session</li>
+                  <li>{t('sessionList.convertNote1')}</li>
+                  <li>{t('sessionList.convertNote2')}</li>
+                  <li>{t('sessionList.convertNote3')}</li>
+                  <li>{t('sessionList.convertNote4')}</li>
                 </ul>
               </div>
             </div>
@@ -753,12 +753,12 @@ export const SessionList: React.FC<SessionListProps> = ({
               {isConverting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  转换中...
+                  {t('sessionList.converting')}
                 </>
               ) : (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  确认转换
+                  {t('sessionList.confirmConvert')}
                 </>
               )}
             </Button>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronDown,
@@ -81,6 +82,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
   onProjectPathChange,
   isActive = true, // 默认为活跃状态，保持向后兼容
 }) => {
+  const { t } = useTranslation();
   const [projectPath, setProjectPath] = useState(initialProjectPath || session?.project_path || "");
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const {
@@ -539,7 +541,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
       const cancelMessage: ClaudeStreamMessage = {
         type: "system",
         subtype: "info",
-        result: "用户已取消会话",
+        result: "__USER_CANCELLED__", // Will be translated in render
         timestamp: new Date().toISOString(),
         receivedAt: new Date().toISOString()
       };
@@ -857,11 +859,11 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
         floatingPromptRef.current.setPrompt(promptText);
       }
 
-      // 显示成功提示
+      // 显示成功提示 - 使用标记文本，将在消息渲染时翻译
       const modeText = {
-        'conversation_only': '对话已删除',
-        'code_only': '代码已回滚',
-        'both': '对话已删除，代码已回滚'
+        'conversation_only': '__REVERT_CONVERSATION_ONLY__',
+        'code_only': '__REVERT_CODE_ONLY__',
+        'both': '__REVERT_BOTH__'
       }[mode];
 
       // 使用简单的成功提示（避免依赖外部 toast 库）
@@ -870,7 +872,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
 
     } catch (error) {
       console.error('[Prompt Revert] Failed to revert:', error);
-      setError('撤回失败：' + error);
+      setError('__REVERT_FAILED__:' + error);
     }
   }, [effectiveSession, projectPath, claudeSettings?.hideWarmupMessages, executionEngineConfig.engine]);
 
@@ -1001,7 +1003,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
                   <div className="flex items-center gap-3">
                     <div className="rotating-symbol text-primary" />
                     <span className="text-sm text-muted-foreground">
-                      {session ? "加载会话历史记录..." : "初始化 Claude Code..."}
+                      {session ? t('claudeSession.loadingHistory') : t('claudeSession.initializingClaude')}
                     </span>
                   </div>
                 </div>
@@ -1028,7 +1030,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
                 <div className="floating-element backdrop-enhanced rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Queued Prompts ({queuedPrompts.length})
+                      {t('session.queuedPrompts', { count: queuedPrompts.length })}
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => setQueuedPromptsCollapsed(prev => !prev)}>
                       {queuedPromptsCollapsed ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -1089,13 +1091,13 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
                         animate={{ opacity: 1, scale: 1 }}
                         className="flex flex-col items-center gap-1 bg-background/60 backdrop-blur-md border border-border/50 rounded-xl px-1.5 py-2 cursor-pointer hover:bg-accent/80 shadow-sm"
                         onClick={() => setShowPromptNavigator(true)}
-                        title="提示词导航 - 快速跳转到任意提示词"
+                        title={t('claudeSession.promptNav')}
                       >
                         <List className="h-4 w-4" />
                         <div className="flex flex-col items-center text-[10px] leading-tight tracking-wider">
-                          <span>提</span>
-                          <span>示</span>
-                          <span>词</span>
+                          <span>{t('session.promptChar1')}</span>
+                          <span>{t('session.promptChar2')}</span>
+                          <span>{t('session.promptChar3')}</span>
                         </div>
                       </motion.div>
                     )}
@@ -1118,13 +1120,13 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
                               });
                             }
                           }}
-                          title="新消息 - 点击滚动到底部"
+                          title={t('claudeSession.newMessage')}
                         >
                           <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
                           <div className="flex flex-col items-center text-[10px] leading-tight tracking-wider">
-                            <span>新</span>
-                            <span>消</span>
-                            <span>息</span>
+                            <span>{t('session.newChar1')}</span>
+                            <span>{t('session.newChar2')}</span>
+                            <span>{t('session.newChar3')}</span>
                           </div>
                           <ChevronDown className="h-3 w-3" />
                         </motion.div>
@@ -1147,7 +1149,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
                           }
                         }}
                         className="px-1.5 py-1.5 hover:bg-accent/80 rounded-none h-auto min-h-0"
-                        title="滚动到顶部"
+                        title={t('claudeSession.scrollToTop')}
                       >
                         <ChevronUp className="h-3.5 w-3.5" />
                       </Button>
@@ -1166,7 +1168,7 @@ const ClaudeCodeSessionInner: React.FC<ClaudeCodeSessionProps> = ({
                           }
                         }}
                         className="px-1.5 py-1.5 hover:bg-accent/80 rounded-none h-auto min-h-0"
-                        title="滚动到底部"
+                        title={t('claudeSession.scrollToBottom')}
                       >
                         <ChevronDown className="h-3.5 w-3.5" />
                       </Button>

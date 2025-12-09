@@ -202,7 +202,7 @@ export const MCPWidget: React.FC<MCPWidgetProps> = ({
           {/* 无参数提示 */}
           {!hasInput && (
             <div className="text-xs text-muted-foreground italic px-2">
-              (无参数)
+              {t('widget.noParameters')}
             </div>
           )}
 
@@ -225,7 +225,7 @@ export const MCPWidget: React.FC<MCPWidgetProps> = ({
                     "text-xs font-medium",
                     isError ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
                   )}>
-                    {isError ? '执行失败' : '执行结果'}
+                    {isError ? t('widget.executionFailed') : t('widget.executionResult')}
                   </span>
                 </div>
               </div>

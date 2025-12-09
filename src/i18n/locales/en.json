@@ -1032,7 +1032,8 @@
     "path": "Path",
     "include": "Include",
     "exclude": "Exclude",
-    "todoList": "Todo List"
+    "todoList": "Todo List",
+    "noParameters": "(No parameters)"
   },
   "usageDashboard": {
     "today": "Today",
@@ -1051,7 +1052,33 @@
     "cancelSelection": "Cancel selection",
     "batchSelection": "Batch selection",
     "sessionListLabel": "Session list",
-    "confirmDelete": "Confirm delete"
+    "confirmDelete": "Confirm delete",
+    "backToProjects": "Back to Projects",
+    "all": "All",
+    "selectedCount": "{count} sessions selected",
+    "batchManage": "Batch manage sessions",
+    "selectSession": "Select session {name}",
+    "sessionAriaLabel": "Session: {name}, Time: {time}",
+    "sessionIdLabel": "Session ID: {id}",
+    "convertTo": "Convert session to {engine}",
+    "experimentalConvert": "⚠️ Experimental: Convert to {engine}",
+    "deleteSession": "Delete session {name}",
+    "convertTitle": "Convert Session Engine",
+    "convertDescription": "Convert current session to another engine, generating a new Session ID",
+    "experimentalFeature": "Experimental Feature",
+    "experimentalWarning": "This feature is under testing and stability is unknown. Converted sessions may have format compatibility issues. Recommended to test in non-critical projects.",
+    "confirmConvertTo": "Are you sure you want to convert this session to {engine} engine?",
+    "convertNotes": "Conversion Notes:",
+    "convertNote1": "A new Session ID will be generated",
+    "convertNote2": "Original Session will not be modified or deleted",
+    "convertNote3": "Tool calls will be automatically mapped",
+    "convertNote4": "Only supports completed Sessions",
+    "converting": "Converting...",
+    "confirmConvert": "Confirm Convert",
+    "cancel": "Cancel",
+    "deleteWarning": "Are you sure you want to delete this session? This action cannot be undone.",
+    "deselectAll": "Deselect All",
+    "selectAllOnPage": "Select All on Page"
   },
   "sessionHeader": {
     "enterPathOrBrowse": "Enter project path or click browse button to select"
@@ -1065,12 +1092,6 @@
     "projectListLabel": "Project List",
     "confirmDelete": "Confirm Delete",
     "projectLabel": "Project {{projectName}}, {{sessionCount}} sessions, created {{createdAt}}"
-  },
-  "sessionList": {
-    "gridView": "Grid view",
-    "listView": "List view",
-    "projectListLabel": "Project list",
-    "confirmDelete": "Confirm delete"
   },
   "mcpImport": {
     "invalidJson": "Invalid JSON format. Please check the input format.",

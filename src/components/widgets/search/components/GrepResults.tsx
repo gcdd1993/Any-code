@@ -50,7 +50,7 @@ const parseGrepResults = (resultContent: string, isError: boolean): GrepMatch[] 
         results.push({
           file: trimmedLine,
           lineNumber: 0,
-          content: '(文件包含匹配项)'
+          content: '__FILE_CONTAINS_MATCH__' // Will be replaced with t() in render
         });
       }
     });
@@ -67,7 +67,7 @@ const parseGrepResults = (resultContent: string, isError: boolean): GrepMatch[] 
         results.push({
           file: match[1],
           lineNumber: parseInt(match[2], 10),
-          content: match[3] || '(匹配行)'
+          content: match[3] || '__MATCHED_LINE__' // Will be replaced with t() in render
         });
       } else {
         // 格式 2: 仅文件路径
@@ -75,7 +75,7 @@ const parseGrepResults = (resultContent: string, isError: boolean): GrepMatch[] 
           results.push({
             file: trimmedLine,
             lineNumber: 0,
-            content: '(文件包含匹配项)'
+            content: '__FILE_CONTAINS_MATCH__' // Will be replaced with t() in render
           });
         }
       }
@@ -141,7 +141,7 @@ export const GrepResults: React.FC<GrepResultsProps> = ({
           ) : (
             <ChevronRight className="h-3.5 w-3.5" />
           )}
-          <span>{grepResults.length} 个匹配项</span>
+          <span>{grepResults.length} {t('widget.matches')}</span>
         </button>
 
         {isExpanded && (
@@ -167,7 +167,7 @@ export const GrepResults: React.FC<GrepResultsProps> = ({
                         </span>
                       ) : (
                         <span className="text-xs font-mono text-muted-foreground">
-                          文件
+                          {t('widget.files')}
                         </span>
                       )}
                     </div>
@@ -185,7 +185,9 @@ export const GrepResults: React.FC<GrepResultsProps> = ({
                       </div>
                       {match.content && (
                         <code className="text-xs font-mono block whitespace-pre-wrap break-all text-zinc-700 dark:text-zinc-300">
-                          {match.content.trim()}
+                          {match.content === '__FILE_CONTAINS_MATCH__' ? t('widget.fileContainsMatch') :
+                           match.content === '__MATCHED_LINE__' ? t('widget.matchedLine') :
+                           match.content.trim()}
                         </code>
                       )}
                     </div>
@@ -211,13 +213,13 @@ export const GrepResults: React.FC<GrepResultsProps> = ({
         ) : (
           <ChevronRight className="h-3.5 w-3.5" />
         )}
-        <span>无匹配结果</span>
+        <span>{t('widget.noResults')}</span>
       </button>
       {isExpanded && (
         <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
           <Info className="h-5 w-5 text-amber-500 flex-shrink-0" />
           <div className="text-sm text-amber-600 dark:text-amber-400">
-            没有找到与给定模式匹配的结果。
+            {t('widget.noMatchesFound')}
           </div>
         </div>
       )}
