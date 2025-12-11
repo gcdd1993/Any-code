@@ -151,12 +151,14 @@ export const ViewRouter: React.FC = () => {
       }
 
       refreshSessions();
+      loadProjects(); // 刷新项目列表以更新会话统计
       setToast({ message: `会话已成功删除`, type: "success" });
     } catch (err) {
       console.error("Failed to delete session:", err);
       setToast({ message: `删除会话失败`, type: "error" });
       // Still refresh sessions to reflect any state changes
       refreshSessions();
+      loadProjects(); // 即使失败也刷新，以反映任何部分变更
     }
   };
 
@@ -199,12 +201,14 @@ export const ViewRouter: React.FC = () => {
       }
 
       refreshSessions();
+      loadProjects(); // 刷新项目列表以更新会话统计
       setToast({ message: `成功删除 ${sessionIds.length} 个会话`, type: "success" });
     } catch (err) {
       console.error("Failed to batch delete sessions:", err);
       setToast({ message: `批量删除会话失败`, type: "error" });
       // Still refresh to reflect any partial deletions
       refreshSessions();
+      loadProjects(); // 即使失败也刷新，以反映任何部分变更
     }
   };
 
