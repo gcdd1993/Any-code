@@ -14,6 +14,7 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 use tokio::process::Command;
+use tokio::sync::OnceCell;
 
 // Import platform-specific utilities for window hiding
 use crate::claude_binary::detect_binary_for_tool;
@@ -32,6 +33,10 @@ pub struct CodexAvailability {
     pub version: Option<String>,
     pub error: Option<String>,
 }
+
+/// 全局 Codex 可用性结果缓存
+/// 避免重复创建 WSL 进程检测可用性
+static CODEX_AVAILABILITY_CACHE: OnceCell<CodexAvailability> = OnceCell::const_new();
 
 /// Codex mode configuration info (for frontend display)
 #[derive(Debug, Clone, Serialize)]
@@ -286,10 +291,23 @@ pub fn get_codex_sessions_dir() -> Result<PathBuf, String> {
 // ============================================================================
 
 /// Checks if Codex is available and properly configured
+/// 使用全局缓存避免重复检测，减少 WSL 进程创建
 #[tauri::command]
 pub async fn check_codex_availability() -> Result<CodexAvailability, String> {
-    log::info!("[Codex] Checking availability...");
+    // 使用缓存避免重复检测
+    let result = CODEX_AVAILABILITY_CACHE
+        .get_or_init(|| async {
+            log::info!("[Codex] Checking availability (first time)...");
+            do_check_codex_availability().await
+        })
+        .await;
 
+    log::debug!("[Codex] Returning cached availability: {:?}", result);
+    Ok(result.clone())
+}
+
+/// 实际执行 Codex 可用性检测（内部函数）
+async fn do_check_codex_availability() -> CodexAvailability {
     // 1) Windows: Check WSL mode first
     #[cfg(target_os = "windows")]
     {
@@ -306,11 +324,11 @@ pub async fn check_codex_availability() -> Result<CodexAvailability, String> {
                     version
                 );
 
-                return Ok(CodexAvailability {
+                return CodexAvailability {
                     available: true,
                     version: Some(format!("WSL: {}", version)),
                     error: None,
-                });
+                };
             }
         }
         log::info!("[Codex] WSL mode not available, trying native paths...");
@@ -344,11 +362,11 @@ pub async fn check_codex_availability() -> Result<CodexAvailability, String> {
                         inst.source,
                         version
                     );
-                    return Ok(CodexAvailability {
+                    return CodexAvailability {
                         available: true,
                         version: Some(version),
                         error: None,
-                    });
+                    };
                 } else {
                     log::warn!(
                         "[Codex] Version probe failed for {} (status {:?}), stderr: {}",
@@ -392,11 +410,11 @@ pub async fn check_codex_availability() -> Result<CodexAvailability, String> {
                     };
 
                     log::info!("[Codex] Available via fallback - version: {}", version);
-                    return Ok(CodexAvailability {
+                    return CodexAvailability {
                         available: true,
                         version: Some(version),
                         error: None,
-                    });
+                    };
                 }
             }
             Err(e) => {
@@ -407,11 +425,11 @@ pub async fn check_codex_availability() -> Result<CodexAvailability, String> {
 
     // 4) Complete failure
     log::error!("[Codex] Codex CLI not found via runtime detection or fallback list");
-    Ok(CodexAvailability {
+    CodexAvailability {
         available: false,
         version: None,
         error: Some("Codex CLI not found. Please set CODEX_PATH or install codex CLI".to_string()),
-    })
+    }
 }
 
 // ============================================================================

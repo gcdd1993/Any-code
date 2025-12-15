@@ -8,6 +8,7 @@ use std::process::Stdio;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+use tokio::sync::OnceCell;
 
 use super::config::{build_gemini_env, load_gemini_config};
 use super::parser::{
@@ -18,6 +19,10 @@ use super::types::{GeminiExecutionOptions, GeminiInstallStatus, GeminiProcessSta
 use crate::claude_binary::detect_binary_for_tool;
 use crate::commands::claude::apply_no_window_async;
 use crate::commands::wsl_utils;
+
+/// 全局 Gemini 安装状态缓存
+/// 避免重复创建 WSL 进程检测安装状态
+static GEMINI_INSTALL_STATUS_CACHE: OnceCell<GeminiInstallStatus> = OnceCell::const_new();
 
 // ============================================================================
 // Binary Detection
@@ -246,8 +251,23 @@ fn test_gemini_binary(path: &str) -> bool {
 // ============================================================================
 
 /// Check if Gemini CLI is installed
+/// 使用全局缓存避免重复检测，减少 WSL 进程创建
 #[tauri::command]
 pub async fn check_gemini_installed() -> Result<GeminiInstallStatus, String> {
+    // 使用缓存避免重复检测
+    let result = GEMINI_INSTALL_STATUS_CACHE
+        .get_or_init(|| async {
+            log::info!("[Gemini] Checking installation status (first time)...");
+            do_check_gemini_installed()
+        })
+        .await;
+
+    log::debug!("[Gemini] Returning cached install status: {:?}", result);
+    Ok(result.clone())
+}
+
+/// 实际执行 Gemini 安装检测（内部函数）
+fn do_check_gemini_installed() -> GeminiInstallStatus {
     match find_gemini_binary() {
         Ok(path) => {
             let is_wsl = path.starts_with("WSL:");
@@ -260,19 +280,19 @@ pub async fn check_gemini_installed() -> Result<GeminiInstallStatus, String> {
                 version
             };
 
-            Ok(GeminiInstallStatus {
+            GeminiInstallStatus {
                 installed: true,
                 path: Some(path),
                 version: display_version,
                 error: None,
-            })
+            }
         }
-        Err(e) => Ok(GeminiInstallStatus {
+        Err(e) => GeminiInstallStatus {
             installed: false,
             path: None,
             version: None,
             error: Some(e),
-        }),
+        },
     }
 }
 
