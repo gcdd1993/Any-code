@@ -102,23 +102,25 @@ export const CLAUDE_CONTEXT_WINDOWS = {
 
 // ============================================================================
 // Codex Model Context Windows
-// Source: https://github.com/openai/codex 官方文档
+// Source: https://openrouter.ai/openai/ (2025-12 实际数据)
 // ============================================================================
 
 export const CODEX_CONTEXT_WINDOWS = {
-  // Codex Mini - 最常用
-  'codex-mini': 200000,
-  'codex-mini-latest': 200000,
-  // Codex-1 系列
-  'codex-1': 192000,
-  'codex': 192000,
+  // GPT-5.1-Codex 系列 - Codex CLI 主要使用的模型
+  // All: 400K context window
+  'gpt-5.1-codex': 400000,
+  'gpt-5.1-codex-mini': 400000,
+  'gpt-5.1-codex-max': 400000,
+  // GPT-5.2 系列 - 最新模型
+  // 400K context, 128K max output
+  'gpt-5.2': 400000,
+  'gpt-5.2-instant': 400000,
+  'gpt-5.2-thinking': 400000,
+  'gpt-5.2-pro': 400000,
   // o4-mini (Codex 底层模型)
   'o4-mini': 128000,
-  // GPT-4.1 系列
-  'gpt-4.1': 128000,
-  'gpt-4.1-mini': 128000,
   // 默认值
-  'default': 200000,
+  'default': 400000,
 } as const;
 
 /**
@@ -139,18 +141,39 @@ export function getContextWindowSize(model?: string, engine?: string): number {
       return CODEX_CONTEXT_WINDOWS[lowerModel as keyof typeof CODEX_CONTEXT_WINDOWS];
     }
 
-    // 尝试部分匹配
-    if (lowerModel.includes('codex-mini') || lowerModel.includes('codex_mini')) {
-      return CODEX_CONTEXT_WINDOWS['codex-mini'];
+    // GPT-5.1-Codex 系列
+    if (lowerModel.includes('5.1-codex-max') || lowerModel.includes('5_1_codex_max')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.1-codex-max'];
     }
-    if (lowerModel.includes('codex-1') || lowerModel.includes('codex_1')) {
-      return CODEX_CONTEXT_WINDOWS['codex-1'];
+    if (lowerModel.includes('5.1-codex-mini') || lowerModel.includes('5_1_codex_mini')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.1-codex-mini'];
     }
+    if (lowerModel.includes('5.1-codex') || lowerModel.includes('5_1_codex')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.1-codex'];
+    }
+
+    // GPT-5.2 系列 (Instant, Thinking, Pro variants)
+    if (lowerModel.includes('5.2-pro') || lowerModel.includes('5_2_pro')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.2-pro'];
+    }
+    if (lowerModel.includes('5.2-thinking') || lowerModel.includes('5_2_thinking')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.2-thinking'];
+    }
+    if (lowerModel.includes('5.2-instant') || lowerModel.includes('5_2_instant')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.2-instant'];
+    }
+    if (lowerModel.includes('gpt-5.2') || lowerModel.includes('gpt_5_2') || lowerModel.includes('5.2')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.2'];
+    }
+
+    // o4-mini
     if (lowerModel.includes('o4-mini') || lowerModel.includes('o4_mini')) {
       return CODEX_CONTEXT_WINDOWS['o4-mini'];
     }
-    if (lowerModel.includes('gpt-4.1') || lowerModel.includes('gpt_4_1')) {
-      return CODEX_CONTEXT_WINDOWS['gpt-4.1'];
+
+    // 通用 Codex 匹配 - 默认使用 gpt-5.1-codex
+    if (lowerModel.includes('codex')) {
+      return CODEX_CONTEXT_WINDOWS['gpt-5.1-codex'];
     }
 
     return CODEX_CONTEXT_WINDOWS['default'];
