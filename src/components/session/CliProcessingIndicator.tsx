@@ -65,6 +65,21 @@ export const CliProcessingIndicator: React.FC<CliProcessingIndicatorProps> = ({
     return () => clearInterval(verbInterval);
   }, [isProcessing]);
 
+  // 监听 Escape 键取消
+  useEffect(() => {
+    if (!isProcessing || !onCancel) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isProcessing, onCancel]);
+
   const currentVerb = PROCESSING_VERBS[verbIndex];
   const dots = ".".repeat(dotCount);
   const paddedDots = dots.padEnd(3, " ");
