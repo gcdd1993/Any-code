@@ -102,29 +102,29 @@ export const CLAUDE_CONTEXT_WINDOWS = {
 
 // ============================================================================
 // Codex Model Context Windows
-// Source: https://platform.openai.com/docs/pricing (2025-12 官方数据)
+// Source: Codex CLI history token_count events expose model_context_window (e.g. 272000 for gpt-5-codex)
 // ============================================================================
 
 export const CODEX_CONTEXT_WINDOWS = {
   // GPT-5.1-Codex 系列 - Codex CLI 主要使用的模型
-  // All: 400K context window
-  'gpt-5.1-codex': 400000,
-  'gpt-5.1-codex-mini': 400000,
-  'gpt-5.1-codex-max': 400000,
-  'gpt-5-codex': 400000,
+  // 272K context window
+  'gpt-5.1-codex': 272000,
+  'gpt-5.1-codex-mini': 272000,
+  'gpt-5.1-codex-max': 272000,
+  'gpt-5-codex': 272000,
   // codex-mini-latest - 默认 Codex CLI 模型
-  // 200K context window
-  'codex-mini-latest': 200000,
+  // 272K context window
+  'codex-mini-latest': 272000,
   // GPT-5.2 系列 - 最新模型
-  // 400K context, 128K max output
-  'gpt-5.2': 400000,
-  'gpt-5.2-instant': 400000,
-  'gpt-5.2-thinking': 400000,
-  'gpt-5.2-pro': 400000,
+  // 272K context, 128K max output
+  'gpt-5.2': 272000,
+  'gpt-5.2-instant': 272000,
+  'gpt-5.2-thinking': 272000,
+  'gpt-5.2-pro': 272000,
   // o4-mini (Codex 底层模型)
   'o4-mini': 128000,
   // 默认值 - 使用 codex-mini-latest 的窗口大小
-  'default': 200000,
+  'default': 272000,
 } as const;
 
 /**

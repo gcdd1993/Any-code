@@ -20,6 +20,7 @@
 
 import { useMemo } from 'react';
 import { getContextWindowSize } from '@/lib/tokenCounter';
+import { normalizeUsageData } from '@/lib/utils';
 import { ContextWindowUsage, ContextUsageLevel, getUsageLevel } from '@/types/contextWindow';
 import type { ClaudeStreamMessage } from '@/types/claude';
 
@@ -45,6 +46,33 @@ export interface UseContextWindowUsageResult extends ContextWindowUsage {
  * 注意：这里的 usage 代表当前 API 调用的上下文使用情况（快照），
  * 而不是单条消息的增量 token 数。
  */
+function getUsageCandidate(message: any, engine?: string): any | null {
+  const usage = message.usage || message.message?.usage;
+  if (usage && typeof usage === 'object') return usage;
+
+  // Codex: fallback to codexMetadata.usage (when available)
+  if (engine === 'codex' && message.codexMetadata?.usage && typeof message.codexMetadata.usage === 'object') {
+    return message.codexMetadata.usage;
+  }
+
+  return null;
+}
+
+function normalizeUsageForIndicator(rawUsage: any): {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+} {
+  const normalized = normalizeUsageData(rawUsage);
+  return {
+    inputTokens: normalized.input_tokens || 0,
+    outputTokens: normalized.output_tokens || 0,
+    cacheCreationTokens: normalized.cache_creation_tokens || 0,
+    cacheReadTokens: normalized.cache_read_tokens || 0,
+  };
+}
+
 function extractCurrentUsage(messages: ClaudeStreamMessage[], engine?: string): {
   inputTokens: number;
   outputTokens: number;
@@ -54,65 +82,55 @@ function extractCurrentUsage(messages: ClaudeStreamMessage[], engine?: string): 
   // 从后向前遍历，找到最后一条带有 usage 的消息
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i] as any;
+    const usage = getUsageCandidate(message, engine);
+    if (!usage) continue;
 
-    // 尝试从不同位置获取 usage 数据
-    // 优先级：message.usage > message.message.usage
-    const usage = message.usage || message.message?.usage;
-
-    if (usage && typeof usage === 'object') {
-      // 提取各字段，处理不同的命名方式
-      const inputTokens = usage.input_tokens || 0;
-      const outputTokens = usage.output_tokens || 0;
-
-      // 缓存创建 tokens（多种命名方式）
-      // Claude API 格式: cache_creation_input_tokens
-      // 规范化格式: cache_creation_tokens / cache_write_tokens
-      const cacheCreationTokens =
-        usage.cache_creation_input_tokens ||
-        usage.cache_creation_tokens ||
-        usage.cache_write_tokens ||
-        0;
-
-      // 缓存读取 tokens（多种命名方式）
-      // Claude API 格式: cache_read_input_tokens
-      // Codex API 格式: cached_input_tokens
-      // 规范化格式: cache_read_tokens
-      const cacheReadTokens =
-        usage.cache_read_input_tokens ||
-        usage.cached_input_tokens ||  // Codex 格式
-        usage.cache_read_tokens ||
-        0;
-
-      // 只有当有有效数据时才返回
-      if (inputTokens > 0 || cacheCreationTokens > 0 || cacheReadTokens > 0) {
-        return {
-          inputTokens,
-          outputTokens,
-          cacheCreationTokens,
-          cacheReadTokens,
-        };
-      }
-    }
-
-    // Codex: 检查 codexMetadata 中的 usage
-    if (engine === 'codex' && message.codexMetadata?.usage) {
-      const codexUsage = message.codexMetadata.usage;
-      const inputTokens = codexUsage.input_tokens || 0;
-      const outputTokens = codexUsage.output_tokens || 0;
-      const cacheReadTokens = codexUsage.cached_input_tokens || 0;
-
-      if (inputTokens > 0 || cacheReadTokens > 0) {
-        return {
-          inputTokens,
-          outputTokens,
-          cacheCreationTokens: 0,
-          cacheReadTokens,
-        };
-      }
+    const normalized = normalizeUsageForIndicator(usage);
+    if (
+      normalized.inputTokens > 0 ||
+      normalized.outputTokens > 0 ||
+      normalized.cacheCreationTokens > 0 ||
+      normalized.cacheReadTokens > 0
+    ) {
+      return normalized;
     }
   }
 
   return null;
+}
+
+function extractCodexCumulativeUsage(messages: ClaudeStreamMessage[]): {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+} | null {
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheCreationTokens = 0;
+  let cacheReadTokens = 0;
+
+  for (const msg of messages as any[]) {
+    // Skip known cumulative-total events (not per-call deltas)
+    if (msg?.codexMetadata?.codexItemType === 'thread_token_usage_updated') {
+      continue;
+    }
+
+    const rawUsage = getUsageCandidate(msg, 'codex');
+    if (!rawUsage) continue;
+
+    const normalized = normalizeUsageForIndicator(rawUsage);
+    inputTokens += normalized.inputTokens;
+    outputTokens += normalized.outputTokens;
+    cacheCreationTokens += normalized.cacheCreationTokens;
+    cacheReadTokens += normalized.cacheReadTokens;
+  }
+
+  if (inputTokens === 0 && outputTokens === 0 && cacheCreationTokens === 0 && cacheReadTokens === 0) {
+    return null;
+  }
+
+  return { inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens };
 }
 
 /**
@@ -140,7 +158,18 @@ export function useContextWindowUsage(
 ): UseContextWindowUsageResult {
   return useMemo(() => {
     // 获取上下文窗口大小（根据引擎和模型）
-    const contextWindowSize = getContextWindowSize(model, engine);
+    let contextWindowSize = getContextWindowSize(model, engine);
+
+    // Codex: prefer runtime-reported context window when available (token_count events)
+    if (engine === 'codex') {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const maybeCtx = (messages[i] as any)?.codexMetadata?.modelContextWindow;
+        if (typeof maybeCtx === 'number' && maybeCtx > 0) {
+          contextWindowSize = maybeCtx;
+          break;
+        }
+      }
+    }
 
     // 默认返回值
     const defaultResult: UseContextWindowUsageResult = {
@@ -164,8 +193,10 @@ export function useContextWindowUsage(
       return defaultResult;
     }
 
-    // 从最后一条消息中提取 current_usage 数据（支持多引擎）
-    const currentUsage = extractCurrentUsage(messages, engine);
+    // Codex: 累计统计（历史 JSONL 中 token_count 事件提供 last/total usage；我们在转换层生成 delta usage）
+    const currentUsage = engine === 'codex'
+      ? extractCodexCumulativeUsage(messages)
+      : extractCurrentUsage(messages, engine);
 
     if (!currentUsage) {
       return defaultResult;

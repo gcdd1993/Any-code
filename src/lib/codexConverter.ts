@@ -73,6 +73,9 @@ function mapCodexToolName(codexName: string): string {
 export class CodexEventConverter {
   private threadId: string | null = null;
   private currentTurnUsage: { input_tokens: number; cached_input_tokens?: number; output_tokens: number } | null = null;
+  private lastTokenCountTotal: { input_tokens: number; cached_input_tokens?: number; output_tokens: number } | null = null;
+  private tokenCountSeq = 0;
+  private activeModel: string | null = null;
   private itemMap: Map<string, CodexItem> = new Map();
   /** Stores tool results by call_id for later matching with tool_use */
   private toolResults: Map<string, { content: string; is_error: boolean }> = new Map();
@@ -164,6 +167,9 @@ export class CodexEventConverter {
 
         case 'session_meta':
           // Return init message
+          if (typeof (event as any)?.payload?.model === 'string') {
+            this.activeModel = (event as any).payload.model;
+          }
           return {
             type: 'system',
             subtype: 'init',
@@ -181,6 +187,9 @@ export class CodexEventConverter {
 
         case 'turn_context':
           // Turn context events are metadata, don't display
+          if (typeof (event as any)?.payload?.model === 'string') {
+            this.activeModel = (event as any).payload.model;
+          }
           console.log('[CodexConverter] Skipping turn_context event');
           return null;
 
@@ -206,8 +215,12 @@ export class CodexEventConverter {
         return null;
 
       case 'token_count':
-        // Skip token count events - they are displayed separately via turn.completed
-        return null;
+        // token_count events are the ONLY persisted usage signal in Codex history.jsonl
+        // (session_meta/response_item/event_msg format). We convert them into a hidden
+        // system message with a per-update (delta) usage payload so that:
+        // - session cost can be recomputed from JSONL history
+        // - context window/token stats can be accumulated across the session
+        return this.convertTokenCountEvent(event);
 
       case 'user_message':
         // ⚠️ DUPLICATE DETECTION: Codex sends BOTH event_msg.user_message AND response_item (role: user)
@@ -226,6 +239,84 @@ export class CodexEventConverter {
         console.log('[CodexConverter] Skipping event_msg with payload.type:', payload.type);
         return null;
     }
+  }
+
+  private convertTokenCountEvent(event: import('@/types/codex').CodexEvent): ClaudeStreamMessage | null {
+    const ts = event.timestamp || new Date().toISOString();
+    const payload: any = (event as any).payload;
+
+    const info = payload?.info;
+    if (!info || typeof info !== 'object') {
+      return null;
+    }
+
+    const total = info.total_token_usage;
+    const last = info.last_token_usage;
+
+    const totalUsage = total && typeof total === 'object'
+      ? {
+        input_tokens: Number(total.input_tokens) || 0,
+        cached_input_tokens: total.cached_input_tokens !== undefined ? (Number(total.cached_input_tokens) || 0) : 0,
+        output_tokens: Number(total.output_tokens) || 0,
+      }
+      : null;
+
+    const lastUsage = last && typeof last === 'object'
+      ? {
+        input_tokens: Number(last.input_tokens) || 0,
+        cached_input_tokens: last.cached_input_tokens !== undefined ? (Number(last.cached_input_tokens) || 0) : 0,
+        output_tokens: Number(last.output_tokens) || 0,
+      }
+      : null;
+
+    // Prefer explicit delta (last_token_usage). If absent, derive delta from totals.
+    let deltaUsage: { input_tokens: number; cached_input_tokens?: number; output_tokens: number } | null = null;
+
+    if (lastUsage) {
+      deltaUsage = lastUsage;
+    } else if (totalUsage && this.lastTokenCountTotal) {
+      deltaUsage = {
+        input_tokens: Math.max(totalUsage.input_tokens - (this.lastTokenCountTotal.input_tokens || 0), 0),
+        cached_input_tokens: Math.max((totalUsage.cached_input_tokens || 0) - (this.lastTokenCountTotal.cached_input_tokens || 0), 0),
+        output_tokens: Math.max(totalUsage.output_tokens - (this.lastTokenCountTotal.output_tokens || 0), 0),
+      };
+    } else if (totalUsage) {
+      deltaUsage = totalUsage;
+    }
+
+    if (totalUsage) {
+      this.lastTokenCountTotal = totalUsage;
+    }
+
+    if (!deltaUsage) {
+      return null;
+    }
+
+    const modelContextWindow = typeof info.model_context_window === 'number'
+      ? info.model_context_window
+      : undefined;
+
+    const codexItemId = `token_count_${++this.tokenCountSeq}`;
+
+    return {
+      type: 'system',
+      subtype: 'info',
+      id: codexItemId,
+      // Hidden meta message (used for stats/cost only)
+      isMeta: true,
+      timestamp: ts,
+      receivedAt: ts,
+      engine: 'codex' as const,
+      model: this.activeModel || undefined,
+      usage: deltaUsage,
+      codexMetadata: {
+        codexItemType: 'token_count',
+        codexItemId,
+        threadId: this.threadId || undefined,
+        usage: totalUsage || deltaUsage,
+        modelContextWindow,
+      } as any,
+    };
   }
 
   /**
@@ -973,6 +1064,7 @@ export class CodexEventConverter {
       timestamp: ts,
       receivedAt: ts,
       engine: 'codex' as const,
+      model: this.activeModel || undefined,
       usage,
     };
   }
@@ -1035,7 +1127,11 @@ export class CodexEventConverter {
   reset(): void {
     this.threadId = null;
     this.currentTurnUsage = null;
+    this.lastTokenCountTotal = null;
+    this.tokenCountSeq = 0;
+    this.activeModel = null;
     this.itemMap.clear();
+    this.toolResults.clear();
   }
 }
 

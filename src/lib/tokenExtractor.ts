@@ -141,7 +141,7 @@ export function normalizeRawUsage(rawUsage: RawTokenUsage | null | undefined): S
   }
 
   // 提取基础token数据
-  const input_tokens = rawUsage.input_tokens ?? 0;
+  let input_tokens = rawUsage.input_tokens ?? 0;
   const output_tokens = rawUsage.output_tokens ?? 0;
 
   // 智能映射缓存创建token（处理所有发现的命名变体）
@@ -174,6 +174,12 @@ export function normalizeRawUsage(rawUsage: RawTokenUsage | null | undefined): S
     rawUsage.cache_read_tokens ??
     rawUsage.cache_read_input_tokens ??
     rawUsage.cached_input_tokens ?? 0;  // Codex 格式
+
+  // Codex/OpenAI: cached_input_tokens 是 input_tokens 的子集（而不是额外增加的 tokens）
+  // 标准化后将 input_tokens 视为“未命中缓存的输入 tokens”，避免与 cache_read_tokens 重复计算。
+  if (rawUsage.cached_input_tokens !== undefined && rawUsage.cached_input_tokens !== null) {
+    input_tokens = Math.max(input_tokens - (Number(rawUsage.cached_input_tokens) || 0), 0);
+  }
 
   // 计算总token数量（优先使用记录值，否则计算）
   const total_tokens = rawUsage.total_tokens ?? rawUsage.tokens ??
