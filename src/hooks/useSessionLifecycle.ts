@@ -150,6 +150,31 @@ export function useSessionLifecycle(config: UseSessionLifecycleConfig): UseSessi
         if ((msg as any).codexMetadata?.usage) {
           (msg as any).codexMetadata.usage = normalizeUsageData((msg as any).codexMetadata.usage);
         }
+
+        // 🆕 FIX: Retype slash command output messages from 'user' to 'system'
+        // Claude CLI returns slash command output (e.g., /cost, /context) wrapped in <local-command-stdout> tags
+        // These should be displayed as system messages, not user messages
+        if (msg.type === 'user') {
+          const content = msg.message?.content;
+          let hasCommandOutput = false;
+
+          if (typeof content === 'string') {
+            hasCommandOutput = content.includes('<local-command-stdout>');
+          } else if (Array.isArray(content)) {
+            hasCommandOutput = content.some((item: any) =>
+              item?.type === 'text' && item?.text?.includes('<local-command-stdout>')
+            );
+          }
+
+          if (hasCommandOutput) {
+            return {
+              ...msg,
+              type: 'system' as const,
+              subtype: 'command-output'
+            };
+          }
+        }
+
         return msg;
       });
 
