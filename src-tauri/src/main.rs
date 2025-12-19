@@ -95,6 +95,8 @@ use commands::codex::{
     get_codex_prompt_list,
     // Codex provider management
     get_codex_provider_presets,
+    // Codex usage statistics
+    get_codex_usage_stats,
     get_current_codex_config,
     list_codex_sessions,
     load_codex_session_history,
@@ -141,6 +143,8 @@ use commands::gemini::{
     get_gemini_session_detail,
     get_gemini_session_logs,
     get_gemini_system_prompt,
+    // Gemini Usage Statistics
+    get_gemini_usage_stats,
     // Gemini WSL commands
     get_gemini_wsl_mode_config,
     list_gemini_sessions,
@@ -476,6 +480,8 @@ fn main() {
             delete_codex_provider_config,
             clear_codex_provider_config,
             test_codex_provider_connection,
+            // Codex Usage Statistics
+            get_codex_usage_stats,
             // Session Conversion (Claude ↔ Codex)
             convert_session,
             convert_claude_to_codex,
@@ -521,6 +527,8 @@ fn main() {
             // Gemini WSL Commands
             get_gemini_wsl_mode_config,
             set_gemini_wsl_mode_config,
+            // Gemini Usage Statistics
+            get_gemini_usage_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

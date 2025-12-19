@@ -1194,6 +1194,56 @@ export const api = {
   },
 
   // ============================================================================
+  // CODEX USAGE STATISTICS
+  // ============================================================================
+
+  /**
+   * Gets Codex usage statistics
+   * @param startDate - Optional start date (YYYY-MM-DD)
+   * @param endDate - Optional end date (YYYY-MM-DD)
+   * @returns Promise resolving to Codex usage statistics
+   */
+  async getCodexUsageStats(
+    startDate?: string,
+    endDate?: string
+  ): Promise<import('@/types/usage').CodexUsageStats> {
+    try {
+      return await invoke<import('@/types/usage').CodexUsageStats>("get_codex_usage_stats", {
+        startDate,
+        endDate,
+      });
+    } catch (error) {
+      console.error("Failed to get Codex usage stats:", error);
+      throw error;
+    }
+  },
+
+  // ============================================================================
+  // GEMINI USAGE STATISTICS
+  // ============================================================================
+
+  /**
+   * Gets Gemini usage statistics
+   * @param startDate - Optional start date (YYYY-MM-DD)
+   * @param endDate - Optional end date (YYYY-MM-DD)
+   * @returns Promise resolving to Gemini usage statistics
+   */
+  async getGeminiUsageStats(
+    startDate?: string,
+    endDate?: string
+  ): Promise<import('@/types/usage').GeminiUsageStats> {
+    try {
+      return await invoke<import('@/types/usage').GeminiUsageStats>("get_gemini_usage_stats", {
+        startDate,
+        endDate,
+      });
+    } catch (error) {
+      console.error("Failed to get Gemini usage stats:", error);
+      throw error;
+    }
+  },
+
+  // ============================================================================
   // MCP SERVER OPERATIONS
   // ============================================================================
 

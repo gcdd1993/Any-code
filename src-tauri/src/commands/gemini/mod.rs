@@ -16,6 +16,7 @@ pub mod parser;
 pub mod provider;
 pub mod session;
 pub mod types;
+pub mod usage;
 
 // Re-export process state for main.rs
 pub use types::GeminiProcessState;
@@ -51,3 +52,10 @@ pub use provider::{
     get_current_gemini_provider_config, get_gemini_provider_presets, switch_gemini_provider,
     test_gemini_provider_connection, update_gemini_provider_config,
 };
+
+// Re-export Gemini Usage Statistics commands
+pub use usage::get_gemini_usage_stats;
+
+// Usage types
+#[allow(unused_imports)]
+pub use usage::{GeminiDailyUsage, GeminiModelUsage, GeminiProjectUsage, GeminiSessionUsage, GeminiUsageStats};

@@ -13,6 +13,7 @@ pub mod config;
 pub mod git_ops;
 pub mod session;
 pub mod session_converter;
+pub mod usage;
 
 // ============================================================================
 // Re-export Types (allow unused for API compatibility)
@@ -92,3 +93,13 @@ pub use git_ops::{
     extract_codex_prompts, get_codex_git_records_dir, load_codex_git_records,
     save_codex_git_records, truncate_codex_git_records, truncate_codex_session_to_prompt,
 };
+
+// ============================================================================
+// Re-export Tauri Commands - Usage Statistics
+// ============================================================================
+
+pub use usage::get_codex_usage_stats;
+
+// Usage types
+#[allow(unused_imports)]
+pub use usage::{CodexDailyUsage, CodexModelUsage, CodexProjectUsage, CodexSessionUsage, CodexUsageStats};

@@ -5,14 +5,20 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { api, type UsageStats, type ProjectUsage } from "@/lib/api";
-import { 
-  Calendar, 
+import type { CodexUsageStats, GeminiUsageStats, EngineType, ModelUsage } from "@/types/usage";
+import { ENGINE_COLORS, ENGINE_LABELS } from "@/types/usage";
+import { ClaudeIcon } from "@/components/icons/ClaudeIcon";
+import { CodexIcon } from "@/components/icons/CodexIcon";
+import { GeminiIcon } from "@/components/icons/GeminiIcon";
+import {
+  Calendar,
   Filter,
   Loader2,
   Briefcase,
   ChevronLeft,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  Layers
 } from "lucide-react";
 
 interface UsageDashboardProps {
@@ -38,7 +44,12 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
   const [selectedDateRange, setSelectedDateRange] = useState<"today" | "7d" | "30d" | "all">("7d");
   const [activeTab, setActiveTab] = useState("overview");
   const [hasLoadedTabs, setHasLoadedTabs] = useState<Set<string>>(new Set(["overview"]));
-  
+
+  // Multi-engine state
+  const [selectedEngine, setSelectedEngine] = useState<EngineType | "all">("all");
+  const [codexStats, setCodexStats] = useState<CodexUsageStats | null>(null);
+  const [geminiStats, setGeminiStats] = useState<GeminiUsageStats | null>(null);
+
   // Pagination states
   const [projectsPage, setProjectsPage] = useState(1);
   const [sessionsPage, setSessionsPage] = useState(1);
@@ -93,21 +104,25 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
 
   const loadUsageStats = useCallback(async () => {
     const cacheKey = `usage-${selectedDateRange}`;
-    
+
     // Check cache first
     const cachedStats = getCachedData(`${cacheKey}-stats`);
     const cachedSessions = getCachedData(`${cacheKey}-sessions`);
-    
-    if (cachedStats && cachedSessions) {
+    const cachedCodex = getCachedData(`${cacheKey}-codex`);
+    const cachedGemini = getCachedData(`${cacheKey}-gemini`);
+
+    if (cachedStats && cachedSessions && cachedCodex !== undefined && cachedGemini !== undefined) {
       setStats(cachedStats);
       setSessionStats(cachedSessions);
+      setCodexStats(cachedCodex);
+      setGeminiStats(cachedGemini);
       setLoading(false);
       return;
     }
 
     try {
       // Always show loading when fetching
-        setLoading(true);
+      setLoading(true);
       setError(null);
 
       // Get today's date range
@@ -122,10 +137,14 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
 
       let statsData: UsageStats;
       let sessionData: ProjectUsage[] = [];
+      let startDateStr: string | undefined;
+      let endDateStr: string | undefined;
 
       if (selectedDateRange === "today") {
         // Today only - 使用本地日期字符串避免时区问题
         const todayDateStr = formatLocalDate(today);
+        startDateStr = todayDateStr;
+        endDateStr = todayDateStr;
         const [statsResult, sessionResult] = await Promise.all([
           api.getUsageByDateRange(todayDateStr, todayDateStr),
           api.getSessionStats()
@@ -146,6 +165,9 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
         const days = selectedDateRange === "7d" ? 7 : 30;
         startDate.setDate(startDate.getDate() - days);
 
+        startDateStr = formatLocalDate(startDate);
+        endDateStr = formatLocalDate(endDate);
+
         // 🚀 修复时区问题：统一使用本地日期格式
         const formatDateForSessionApi = (date: Date) => {
           const year = date.getFullYear();
@@ -156,28 +178,41 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
 
         // Fetch all data in parallel for better performance
         const [statsResult, sessionResult] = await Promise.all([
-          api.getUsageByDateRange(
-            formatLocalDate(startDate),
-            formatLocalDate(endDate)
-          ),
+          api.getUsageByDateRange(startDateStr, endDateStr),
           api.getSessionStats(
             formatDateForSessionApi(startDate),
             formatDateForSessionApi(endDate),
             'desc'
           )
         ]);
-        
+
         statsData = statsResult;
         sessionData = sessionResult;
       }
-      
-      // Update state
+
+      // Update Claude state
       setStats(statsData);
       setSessionStats(sessionData);
-      
-      // Cache the data
+
+      // Cache Claude data
       setCachedData(`${cacheKey}-stats`, statsData);
       setCachedData(`${cacheKey}-sessions`, sessionData);
+
+      // Fetch Codex and Gemini stats in parallel (non-blocking)
+      Promise.allSettled([
+        api.getCodexUsageStats(startDateStr, endDateStr),
+        api.getGeminiUsageStats(startDateStr, endDateStr),
+      ]).then(([codexResult, geminiResult]) => {
+        const codexData = codexResult.status === 'fulfilled' ? codexResult.value : null;
+        const geminiData = geminiResult.status === 'fulfilled' ? geminiResult.value : null;
+
+        setCodexStats(codexData);
+        setGeminiStats(geminiData);
+
+        // Cache multi-engine data
+        setCachedData(`${cacheKey}-codex`, codexData);
+        setCachedData(`${cacheKey}-gemini`, geminiData);
+      });
     } catch (err: any) {
       console.error("Failed to load usage stats:", err);
       setError("Failed to load usage statistics. Please try again.");
@@ -221,17 +256,95 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
     });
   }, [activeTab, stats, loading])
 
+  // Aggregate multi-engine statistics
+  const aggregatedStats = useMemo(() => {
+    const claudeCost = stats?.total_cost || 0;
+    const codexCost = codexStats?.total_cost || 0;
+    const geminiCost = geminiStats?.total_cost || 0;
+
+    const claudeTokens = stats?.total_tokens || 0;
+    const codexTokens = codexStats?.total_tokens || 0;
+    const geminiTokens = geminiStats?.total_tokens || 0;
+
+    const claudeSessions = stats?.total_sessions || 0;
+    const codexSessions = codexStats?.total_sessions || 0;
+    const geminiSessions = geminiStats?.total_sessions || 0;
+
+    // Token breakdown
+    const totalInputTokens = (stats?.total_input_tokens || 0) +
+                             (codexStats?.total_input_tokens || 0) +
+                             (geminiStats?.total_input_tokens || 0);
+    const totalOutputTokens = (stats?.total_output_tokens || 0) +
+                              (codexStats?.total_output_tokens || 0) +
+                              (geminiStats?.total_output_tokens || 0);
+    const totalCacheCreation = (stats?.total_cache_creation_tokens || 0) +
+                               (codexStats?.total_cache_creation_tokens || 0) +
+                               (geminiStats?.total_cache_creation_tokens || 0);
+    const totalCacheRead = (stats?.total_cache_read_tokens || 0) +
+                           (codexStats?.total_cache_read_tokens || 0) +
+                           (geminiStats?.total_cache_read_tokens || 0);
+
+    return {
+      totalCost: claudeCost + codexCost + geminiCost,
+      totalTokens: claudeTokens + codexTokens + geminiTokens,
+      totalSessions: claudeSessions + codexSessions + geminiSessions,
+      totalInputTokens,
+      totalOutputTokens,
+      totalCacheCreation,
+      totalCacheRead,
+      byEngine: [
+        { engine: 'claude' as EngineType, cost: claudeCost, tokens: claudeTokens, sessions: claudeSessions },
+        { engine: 'codex' as EngineType, cost: codexCost, tokens: codexTokens, sessions: codexSessions },
+        { engine: 'gemini' as EngineType, cost: geminiCost, tokens: geminiTokens, sessions: geminiSessions },
+      ],
+    };
+  }, [stats, codexStats, geminiStats]);
+
+  // Get current stats based on selected engine
+  const currentStats = useMemo(() => {
+    if (selectedEngine === 'all') {
+      return {
+        total_cost: aggregatedStats.totalCost,
+        total_tokens: aggregatedStats.totalTokens,
+        total_sessions: aggregatedStats.totalSessions,
+        total_input_tokens: aggregatedStats.totalInputTokens,
+        total_output_tokens: aggregatedStats.totalOutputTokens,
+        total_cache_creation_tokens: aggregatedStats.totalCacheCreation,
+        total_cache_read_tokens: aggregatedStats.totalCacheRead,
+        by_model: [
+          ...(stats?.by_model || []).map(m => ({ ...m, engine: 'claude' as EngineType })),
+          ...(codexStats?.by_model || []).map(m => ({ ...m, engine: 'codex' as EngineType })),
+          ...(geminiStats?.by_model || []).map(m => ({ ...m, engine: 'gemini' as EngineType })),
+        ].sort((a, b) => b.total_cost - a.total_cost),
+        by_project: [
+          ...(stats?.by_project || []).map(p => ({ ...p, engine: 'claude' as EngineType })),
+          ...(codexStats?.by_project || []).map(p => ({ ...p, engine: 'codex' as EngineType })),
+          ...(geminiStats?.by_project || []).map(p => ({ ...p, engine: 'gemini' as EngineType })),
+        ].sort((a, b) => b.total_cost - a.total_cost),
+        by_date: stats?.by_date || [],
+      };
+    }
+    if (selectedEngine === 'claude') return stats;
+    if (selectedEngine === 'codex') return codexStats;
+    if (selectedEngine === 'gemini') return geminiStats;
+    return stats;
+  }, [selectedEngine, stats, codexStats, geminiStats, aggregatedStats]);
+
   // Memoize expensive computations
   const summaryCards = useMemo(() => {
-    if (!stats) return null;
-    
+    if (!currentStats) return null;
+
+    const totalCost = currentStats.total_cost || 0;
+    const totalSessions = currentStats.total_sessions || 0;
+    const totalTokens = currentStats.total_tokens || 0;
+
     return (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-4 shimmer-hover">
           <div>
             <p className="text-caption text-muted-foreground">{t('usageDashboard.totalCost')}</p>
             <p className="text-display-2 mt-1">
-              {formatCurrency(stats.total_cost)}
+              {formatCurrency(totalCost)}
             </p>
           </div>
         </Card>
@@ -240,7 +353,7 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
           <div>
             <p className="text-caption text-muted-foreground">{t('usageDashboard.totalSessions')}</p>
             <p className="text-display-2 mt-1">
-              {formatNumber(stats.total_sessions)}
+              {formatNumber(totalSessions)}
             </p>
           </div>
         </Card>
@@ -249,18 +362,18 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
           <div>
             <p className="text-caption text-muted-foreground">{t('usageDashboard.totalTokens')}</p>
             <p className="text-display-2 mt-1">
-              {formatTokens(stats.total_tokens)}
+              {formatTokens(totalTokens)}
             </p>
           </div>
         </Card>
 
         <Card className="p-4 shimmer-hover">
           <div>
-                        <p className="text-caption text-muted-foreground">{t('usageDashboard.averageCostPerSession')}</p>
+            <p className="text-caption text-muted-foreground">{t('usageDashboard.averageCostPerSession')}</p>
             <p className="text-display-2 mt-1">
               {formatCurrency(
-                stats.total_sessions > 0
-                  ? stats.total_cost / stats.total_sessions
+                totalSessions > 0
+                  ? totalCost / totalSessions
                   : 0
               )}
             </p>
@@ -268,69 +381,92 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
         </Card>
       </div>
     );
-  }, [stats, formatCurrency, formatNumber, formatTokens, t]);
+  }, [currentStats, formatCurrency, formatNumber, formatTokens, t]);
 
   // Memoize the most used models section
   const mostUsedModels = useMemo(() => {
-    if (!stats?.by_model) return null;
-    
-    return stats.by_model.slice(0, 3).map((model) => (
-      <div key={model.model} className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Badge variant="outline" className="text-caption">
-            {getModelDisplayName(model.model)}
-          </Badge>
-          <span className="text-caption text-muted-foreground">
-            {model.session_count} sessions
+    if (!currentStats?.by_model) return null;
+
+    return currentStats.by_model.slice(0, 3).map((model: ModelUsage & { engine?: EngineType }) => {
+      const engineColor = model.engine ? ENGINE_COLORS[model.engine] : ENGINE_COLORS.claude;
+      const EngineIcon = model.engine === 'codex' ? CodexIcon :
+                         model.engine === 'gemini' ? GeminiIcon : ClaudeIcon;
+      return (
+        <div key={`${model.engine || 'claude'}-${model.model}`} className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            {selectedEngine === 'all' && (
+              <EngineIcon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: engineColor }} />
+            )}
+            <Badge
+              variant="outline"
+              className="text-caption"
+              style={{ borderColor: selectedEngine === 'all' ? engineColor : undefined }}
+            >
+              {getModelDisplayName(model.model)}
+            </Badge>
+            <span className="text-caption text-muted-foreground">
+              {model.session_count} sessions
+            </span>
+          </div>
+          <span className="text-body-small font-medium">
+            {formatCurrency(model.total_cost)}
           </span>
         </div>
-        <span className="text-body-small font-medium">
-          {formatCurrency(model.total_cost)}
-        </span>
-      </div>
-    ));
-  }, [stats, formatCurrency, getModelDisplayName]);
+      );
+    });
+  }, [currentStats, formatCurrency, getModelDisplayName, selectedEngine]);
 
   // Memoize top projects section
   const topProjects = useMemo(() => {
-    if (!stats?.by_project) return null;
-    
-    return stats.by_project.slice(0, 3).map((project) => (
-      <div key={project.project_path} className="flex items-center justify-between">
-        <div className="flex flex-col">
-          <span className="text-body-small font-medium truncate max-w-[200px]" title={project.project_path}>
-            {project.project_path}
-          </span>
-          <span className="text-caption text-muted-foreground">
-            {project.session_count} sessions
+    if (!currentStats?.by_project) return null;
+
+    return currentStats.by_project.slice(0, 3).map((project: ProjectUsage & { engine?: EngineType }) => {
+      const engineColor = project.engine ? ENGINE_COLORS[project.engine] : ENGINE_COLORS.claude;
+      const EngineIcon = project.engine === 'codex' ? CodexIcon :
+                         project.engine === 'gemini' ? GeminiIcon : ClaudeIcon;
+      return (
+        <div key={`${project.engine || 'claude'}-${project.project_path}`} className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {selectedEngine === 'all' && (
+              <EngineIcon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: engineColor }} />
+            )}
+            <div className="flex flex-col">
+              <span className="text-body-small font-medium truncate max-w-[180px]" title={project.project_path}>
+                {project.project_path}
+              </span>
+              <span className="text-caption text-muted-foreground">
+                {project.session_count} sessions
+              </span>
+            </div>
+          </div>
+          <span className="text-body-small font-medium">
+            {formatCurrency(project.total_cost)}
           </span>
         </div>
-        <span className="text-body-small font-medium">
-          {formatCurrency(project.total_cost)}
-        </span>
-      </div>
-    ));
-  }, [stats, formatCurrency]);
+      );
+    });
+  }, [currentStats, formatCurrency, selectedEngine]);
 
   // Memoize timeline chart data
   const timelineChartData = useMemo(() => {
-    if (!stats?.by_date || stats.by_date.length === 0) return null;
-    
-    const maxCost = Math.max(...stats.by_date.map(d => d.total_cost), 0);
+    const byDate = currentStats?.by_date;
+    if (!byDate || byDate.length === 0) return null;
+
+    const maxCost = Math.max(...byDate.map((d: any) => d.total_cost), 0);
     const halfMaxCost = maxCost / 2;
-    const reversedData = stats.by_date.slice().reverse();
-    
+    const reversedData = byDate.slice().reverse();
+
     return {
       maxCost,
       halfMaxCost,
       reversedData,
-      bars: reversedData.map(day => ({
+      bars: reversedData.map((day: any) => ({
         ...day,
         heightPercent: maxCost > 0 ? (day.total_cost / maxCost) * 100 : 0,
         date: new Date(day.date.replace(/-/g, '/')),
       }))
     };
-  }, [stats?.by_date]);
+  }, [currentStats?.by_date]);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -373,6 +509,72 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
               </div>
             </div>
           </div>
+
+          {/* Engine Selector */}
+          <div className="mt-4">
+            <div className="flex items-center space-x-2">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              <div className="flex space-x-1">
+                <Button
+                  variant={selectedEngine === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedEngine("all")}
+                  disabled={loading}
+                  className="gap-1.5"
+                >
+                  <span>全部引擎</span>
+                </Button>
+                <Button
+                  variant={selectedEngine === "claude" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedEngine("claude")}
+                  disabled={loading}
+                  className="gap-1.5"
+                  style={{ borderColor: selectedEngine === "claude" ? ENGINE_COLORS.claude : undefined }}
+                >
+                  <ClaudeIcon className="h-3.5 w-3.5" />
+                  <span>Claude</span>
+                  {stats && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {formatCurrency(stats.total_cost)}
+                    </Badge>
+                  )}
+                </Button>
+                <Button
+                  variant={selectedEngine === "codex" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedEngine("codex")}
+                  disabled={loading}
+                  className="gap-1.5"
+                  style={{ borderColor: selectedEngine === "codex" ? ENGINE_COLORS.codex : undefined }}
+                >
+                  <CodexIcon className="h-3.5 w-3.5" />
+                  <span>Codex</span>
+                  {codexStats && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {formatCurrency(codexStats.total_cost)}
+                    </Badge>
+                  )}
+                </Button>
+                <Button
+                  variant={selectedEngine === "gemini" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedEngine("gemini")}
+                  disabled={loading}
+                  className="gap-1.5"
+                  style={{ borderColor: selectedEngine === "gemini" ? ENGINE_COLORS.gemini : undefined }}
+                >
+                  <GeminiIcon className="h-3.5 w-3.5" />
+                  <span>Gemini</span>
+                  {geminiStats && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {formatCurrency(geminiStats.total_cost)}
+                    </Badge>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Content */}
@@ -388,8 +590,46 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
                 Try Again
               </Button>
             </div>
-          ) : stats ? (
+          ) : currentStats ? (
             <div className="space-y-6">
+              {/* Engine Stats Cards (only show in "all" mode) */}
+              {selectedEngine === "all" && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {aggregatedStats.byEngine.map((engine) => {
+                    const EngineIcon = engine.engine === 'claude' ? ClaudeIcon :
+                                       engine.engine === 'codex' ? CodexIcon : GeminiIcon;
+                    const engineColor = ENGINE_COLORS[engine.engine];
+                    return (
+                      <Card
+                        key={engine.engine}
+                        className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+                        style={{ borderLeft: `4px solid ${engineColor}` }}
+                        onClick={() => setSelectedEngine(engine.engine)}
+                      >
+                        <div className="flex items-center gap-3 mb-3">
+                          <EngineIcon className="h-5 w-5" style={{ color: engineColor }} />
+                          <span className="font-medium">{ENGINE_LABELS[engine.engine]}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <p className="text-muted-foreground text-xs">成本</p>
+                            <p className="font-semibold">{formatCurrency(engine.cost)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">会话</p>
+                            <p className="font-semibold">{formatNumber(engine.sessions)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">Token</p>
+                            <p className="font-semibold">{formatTokens(engine.tokens)}</p>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Summary Cards */}
               {summaryCards}
 
@@ -413,19 +653,19 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
                         <p className="text-caption text-muted-foreground">{t('usageDashboard.inputTokens')}</p>
-                        <p className="text-heading-4">{formatTokens(stats.total_input_tokens)}</p>
+                        <p className="text-heading-4">{formatTokens(currentStats?.total_input_tokens || 0)}</p>
                       </div>
                       <div>
                         <p className="text-caption text-muted-foreground">{t('usageDashboard.outputTokens')}</p>
-                        <p className="text-heading-4">{formatTokens(stats.total_output_tokens)}</p>
+                        <p className="text-heading-4">{formatTokens(currentStats?.total_output_tokens || 0)}</p>
                       </div>
                       <div>
                         <p className="text-caption text-muted-foreground">{t('usageDashboard.cacheWrite')}</p>
-                        <p className="text-heading-4">{formatTokens(stats.total_cache_creation_tokens)}</p>
+                        <p className="text-heading-4">{formatTokens(currentStats?.total_cache_creation_tokens || 0)}</p>
                       </div>
                       <div>
                         <p className="text-caption text-muted-foreground">{t('usageDashboard.cacheRead')}</p>
-                        <p className="text-heading-4">{formatTokens(stats.total_cache_read_tokens)}</p>
+                        <p className="text-heading-4">{formatTokens(currentStats?.total_cache_read_tokens || 0)}</p>
                       </div>
                     </div>
                   </Card>
@@ -450,49 +690,66 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
 
                 {/* Models Tab - Lazy render and cache */}
                 <TabsContent value="models" className="space-y-6 mt-6">
-                  {hasLoadedTabs.has("models") && stats && (
+                  {hasLoadedTabs.has("models") && currentStats && (
                     <div style={{ display: activeTab === "models" ? "block" : "none" }}>
                       <Card className="p-6">
-                        <h3 className="text-sm font-semibold mb-4">{t('usageDashboard.modelStats')}</h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-sm font-semibold">{t('usageDashboard.modelStats')}</h3>
+                          <span className="text-xs text-muted-foreground">
+                            {currentStats.by_model?.length || 0} 个模型
+                          </span>
+                        </div>
                         <div className="space-y-4">
-                          {stats.by_model.map((model) => (
-                          <div key={model.model} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <Badge 
-                                  variant="outline" 
-                                  className="text-xs"
-                                >
-                                  {getModelDisplayName(model.model)}
-                                </Badge>
-                                <span className="text-sm text-muted-foreground">
-                                  {model.session_count} sessions
-                                </span>
+                          {(currentStats.by_model || []).map((model: ModelUsage & { engine?: EngineType }) => {
+                            const engineColor = model.engine ? ENGINE_COLORS[model.engine] : ENGINE_COLORS.claude;
+                            const EngineIcon = model.engine === 'codex' ? CodexIcon :
+                                               model.engine === 'gemini' ? GeminiIcon : ClaudeIcon;
+                            return (
+                              <div key={`${model.engine || 'claude'}-${model.model}`} className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-3">
+                                    {selectedEngine === 'all' && (
+                                      <EngineIcon
+                                        className="h-4 w-4 flex-shrink-0"
+                                        style={{ color: engineColor }}
+                                      />
+                                    )}
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                      style={{ borderColor: selectedEngine === 'all' ? engineColor : undefined }}
+                                    >
+                                      {getModelDisplayName(model.model)}
+                                    </Badge>
+                                    <span className="text-sm text-muted-foreground">
+                                      {model.session_count} sessions
+                                    </span>
+                                  </div>
+                                  <span className="text-sm font-semibold">
+                                    {formatCurrency(model.total_cost)}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-4 gap-2 text-xs">
+                                  <div>
+                                    <span className="text-muted-foreground">Input: </span>
+                                    <span className="font-medium">{formatTokens(model.input_tokens)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Output: </span>
+                                    <span className="font-medium">{formatTokens(model.output_tokens)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Cache W: </span>
+                                    <span className="font-medium">{formatTokens(model.cache_creation_tokens || 0)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Cache R: </span>
+                                    <span className="font-medium">{formatTokens(model.cache_read_tokens || 0)}</span>
+                                  </div>
+                                </div>
                               </div>
-                              <span className="text-sm font-semibold">
-                                {formatCurrency(model.total_cost)}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-4 gap-2 text-xs">
-                              <div>
-                                <span className="text-muted-foreground">Input: </span>
-                                <span className="font-medium">{formatTokens(model.input_tokens)}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Output: </span>
-                                <span className="font-medium">{formatTokens(model.output_tokens)}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Cache W: </span>
-                                <span className="font-medium">{formatTokens(model.cache_creation_tokens)}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Cache R: </span>
-                                <span className="font-medium">{formatTokens(model.cache_read_tokens)}</span>
-                              </div>
-                            </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </Card>
                     </div>
@@ -501,53 +758,67 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
 
                 {/* Projects Tab - Lazy render and cache */}
                 <TabsContent value="projects" className="space-y-6 mt-6">
-                  {hasLoadedTabs.has("projects") && stats && (
+                  {hasLoadedTabs.has("projects") && currentStats && (
                     <div style={{ display: activeTab === "projects" ? "block" : "none" }}>
                       <Card className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-sm font-semibold">{t('usageDashboard.projectStats')}</h3>
                         <span className="text-xs text-muted-foreground">
-                          {stats.by_project.length} {t('usageDashboard.totalProjects')}
+                          {currentStats.by_project?.length || 0} {t('usageDashboard.totalProjects')}
                         </span>
                       </div>
                       <div className="space-y-3">
                         {(() => {
+                          const projects = currentStats.by_project || [];
                           const startIndex = (projectsPage - 1) * ITEMS_PER_PAGE;
                           const endIndex = startIndex + ITEMS_PER_PAGE;
-                          const paginatedProjects = stats.by_project.slice(startIndex, endIndex);
-                          const totalPages = Math.ceil(stats.by_project.length / ITEMS_PER_PAGE);
-                          
+                          const paginatedProjects = projects.slice(startIndex, endIndex);
+                          const totalPages = Math.ceil(projects.length / ITEMS_PER_PAGE);
+
                           return (
                             <>
-                              {paginatedProjects.map((project) => (
-                                <div key={project.project_path} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                                  <div className="flex flex-col truncate">
-                                    <span className="text-sm font-medium truncate" title={project.project_path}>
-                                      {project.project_path}
-                                    </span>
-                                    <div className="flex items-center space-x-3 mt-1">
-                                      <span className="text-caption text-muted-foreground">
-                                        {project.session_count} sessions
-                                      </span>
-                                      <span className="text-caption text-muted-foreground">
-                                        {formatTokens(project.total_tokens)} tokens
-                                      </span>
+                              {paginatedProjects.map((project: ProjectUsage & { engine?: EngineType }) => {
+                                const engineColor = project.engine ? ENGINE_COLORS[project.engine] : ENGINE_COLORS.claude;
+                                const EngineIcon = project.engine === 'codex' ? CodexIcon :
+                                                   project.engine === 'gemini' ? GeminiIcon : ClaudeIcon;
+                                return (
+                                  <div key={`${project.engine || 'claude'}-${project.project_path}`} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                                    <div className="flex items-center gap-2 truncate">
+                                      {selectedEngine === 'all' && (
+                                        <EngineIcon
+                                          className="h-4 w-4 flex-shrink-0"
+                                          style={{ color: engineColor }}
+                                        />
+                                      )}
+                                      <div className="flex flex-col truncate">
+                                        <span className="text-sm font-medium truncate" title={project.project_path}>
+                                          {project.project_path}
+                                        </span>
+                                        <div className="flex items-center space-x-3 mt-1">
+                                          <span className="text-caption text-muted-foreground">
+                                            {project.session_count} sessions
+                                          </span>
+                                          <span className="text-caption text-muted-foreground">
+                                            {formatTokens(project.total_tokens)} tokens
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-sm font-semibold">{formatCurrency(project.total_cost)}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {formatCurrency(project.total_cost / project.session_count)}/session
+                                      </p>
                                     </div>
                                   </div>
-                                  <div className="text-right">
-                                    <p className="text-sm font-semibold">{formatCurrency(project.total_cost)}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {formatCurrency(project.total_cost / project.session_count)}/session
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                              
+                                );
+                              })}
+
                               {/* Pagination Controls */}
                               {totalPages > 1 && (
                                 <div className="flex items-center justify-between pt-4">
                                   <span className="text-xs text-muted-foreground">
-                                    Showing {startIndex + 1}-{Math.min(endIndex, stats.by_project.length)} of {stats.by_project.length}
+                                    Showing {startIndex + 1}-{Math.min(endIndex, projects.length)} of {projects.length}
                                   </span>
                                   <div className="flex items-center gap-2">
                                     <Button
@@ -669,7 +940,7 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
 
                 {/* Timeline Tab - Lazy render and cache */}
                 <TabsContent value="timeline" className="space-y-6 mt-6">
-                  {hasLoadedTabs.has("timeline") && stats && (
+                  {hasLoadedTabs.has("timeline") && currentStats && (
                     <div style={{ display: activeTab === "timeline" ? "block" : "none" }}>
                       <Card className="p-6">
                       <h3 className="text-sm font-semibold mb-6 flex items-center space-x-2">
